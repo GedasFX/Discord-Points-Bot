@@ -2,14 +2,20 @@ const { REST, SlashCommandBuilder, PermissionsBitField, Routes } = require("disc
 require("dotenv").config();
 
 const commands = [
-  new SlashCommandBuilder().setName("bal").setDescription("Show your balance"),
+  new SlashCommandBuilder()
+    .setName("bal")
+    .setDescription("Show your or another user's balance")
+    .addUserOption((opt) => opt.setName("user").setDescription("The user whose balance you want to check").setRequired(false)),
+
+  new SlashCommandBuilder().setName("timely").setDescription("Claim your timely reward every 6 hours"),
+
   new SlashCommandBuilder()
     .setName("award")
     .setDescription("Award points to user(s)")
     .addIntegerOption((opt) => opt.setName("amount").setDescription("Amount to award").setRequired(true))
     .addStringOption((opt) => opt.setName("users").setDescription("Text containing multiple user mentions or IDs").setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
-  new SlashCommandBuilder().setName("timely").setDescription("Claim your timely reward every 6 hours"),
+
   new SlashCommandBuilder()
     .setName("configure")
     .setDescription("Configure guild settings")

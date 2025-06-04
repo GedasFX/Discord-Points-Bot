@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, MessageFlags } = require("discord.js");
 const { DateTime } = require("luxon");
 const db = require("./db.js");
 require("dotenv").config();
@@ -12,13 +12,13 @@ client.once("ready", () => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  const userId = interaction.user.id;
+  const userId = interaction.options.getUser("user")?.id || interaction.user.id;
   const guildId = interaction.guildId;
 
   // /bal
   if (interaction.commandName === "bal") {
     const balance = await db.getBalance(userId, guildId);
-    await interaction.reply(`Your balance is ${balance} points.`);
+    await interaction.reply({ content: `<@${userId}>'s balance is ${balance} points.`, flags: MessageFlags.Ephemeral });
   }
 
   // /timely
@@ -37,7 +37,7 @@ client.on("interactionCreate", async (interaction) => {
         const next = lastTimely.plus({ hours: timelyIntervalHours });
         const wait = next.diff(now).toFormat("h 'hours,' m 'minutes'");
 
-        return interaction.reply({ content: `You can claim again in ${wait}.`, ephemeral: true });
+        return interaction.reply({ content: `You can claim again in ${wait}.`, flags: MessageFlags.Ephemeral });
       }
     }
     if (canClaim) {
@@ -45,7 +45,7 @@ client.on("interactionCreate", async (interaction) => {
       await db.setBalance(interaction.user.id, guildId, balance + timelyReward);
       await db.setLastTimely(interaction.user.id, guildId, now.toISO());
 
-      return interaction.reply(`You claimed ${timelyReward} points! Come back in ${timelyIntervalHours} hours.`);
+      return interaction.reply(`You claimed ${timelyReward} points! Come back in ${timelyIntervalHours} hours to claim more.`);
     }
   }
 
@@ -68,9 +68,9 @@ client.on("interactionCreate", async (interaction) => {
     let recipients = [];
     if (users) {
       recipients = parseUserIds(users);
-      if (recipients.length === 0) return interaction.reply({ content: "No valid recipients found in text.", ephemeral: true });
+      if (recipients.length === 0) return interaction.reply({ content: "No valid recipients found in text.", flags: MessageFlags.Ephemeral });
     } else {
-      return interaction.reply({ content: "Please specify a user or text containing users.", ephemeral: true });
+      return interaction.reply({ content: "Please specify a user or text containing users.", flags: MessageFlags.Ephemeral });
     }
 
     for (const rid of recipients) {
@@ -83,11 +83,11 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.options.getSubcommand() === "timely-reward") {
       const amount = interaction.options.getInteger("amount");
       await db.setGuildSetting(guildId, "timely_reward", amount);
-      return interaction.reply({ content: `Timely reward set to ${amount} points.`, ephemeral: true });
+      return interaction.reply({ content: `Timely reward set to ${amount} points.`, flags: MessageFlags.Ephemeral });
     } else if (interaction.options.getSubcommand() === "timely-interval") {
       const hours = interaction.options.getInteger("hours");
       await db.setGuildSetting(guildId, "timely_interval_hours", hours);
-      return interaction.reply({ content: `Timely interval set to ${hours} hours.`, ephemeral: true });
+      return interaction.reply({ content: `Timely interval set to ${hours} hours.`, flags: MessageFlags.Ephemeral });
     }
   }
 });
