@@ -1,0 +1,40 @@
+const { REST, SlashCommandBuilder, PermissionsBitField, Routes } = require("discord.js");
+require("dotenv").config();
+
+const commands = [
+  new SlashCommandBuilder().setName("bal").setDescription("Show your balance"),
+  new SlashCommandBuilder()
+    .setName("award")
+    .setDescription("Award points to user(s)")
+    .addIntegerOption((opt) => opt.setName("amount").setDescription("Amount to award").setRequired(true))
+    .addStringOption((opt) => opt.setName("users").setDescription("Text containing multiple user mentions or IDs").setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  new SlashCommandBuilder().setName("timely").setDescription("Claim your timely reward every 6 hours"),
+  new SlashCommandBuilder()
+    .setName("configure")
+    .setDescription("Configure guild settings")
+    .addSubcommand((sub) =>
+      sub
+        .setName("timely-reward")
+        .setDescription("Set the timely reward amount")
+        .addIntegerOption((opt) => opt.setName("amount").setDescription("Reward amount").setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("timely-interval")
+        .setDescription("Set the timely interval in hours")
+        .addIntegerOption((opt) => opt.setName("hours").setDescription("Interval in hours").setRequired(true))
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+].map((cmd) => cmd.toJSON());
+
+const rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
+
+(async () => {
+  try {
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+    console.log("Slash commands registered!");
+  } catch (error) {
+    console.error(error);
+  }
+})();
