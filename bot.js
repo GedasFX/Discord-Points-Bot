@@ -13,12 +13,15 @@ db.serialize(() => {
     balance INTEGER DEFAULT 0,
     last_timely TEXT,
     PRIMARY KEY (guild_id, user_id)
-    )`);
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS guild_settings (
+    guild_id TEXT PRIMARY KEY,
+    timely_reward INTEGER DEFAULT 100,
+    timely_interval_hours INTEGER DEFAULT 6
+  )`);
 });
 
 const BALANCE_DEFAULT = 0;
-const TIMELY_REWARD = 100;
-const TIMELY_INTERVAL_HOURS = 6;
 
 function getBalance(userId, guildId) {
   return new Promise((resolve, reject) => {
@@ -63,16 +66,54 @@ function setLastTimely(userId, guildId, isoTime) {
   });
 }
 
+function getGuildSetting(guildId, setting) {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT ${setting} FROM guild_settings WHERE guild_id = ?`, [guildId], (err, row) => {
+      if (err) return reject(err);
+      resolve(row ? row[setting] : null);
+    });
+  });
+}
+
+function setGuildSetting(guildId, setting, value) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO guild_settings (guild_id, ${setting}) VALUES (?, ?) ON CONFLICT(guild_id) DO UPDATE SET ${setting} = ?`,
+      [guildId, value, value],
+      function (err) {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
 // Register slash commands
 const commands = [
   new SlashCommandBuilder().setName("bal").setDescription("Show your balance"),
   new SlashCommandBuilder()
     .setName("award")
-    .setDescription("Award coins to user(s)")
+    .setDescription("Award points to user(s)")
     .addIntegerOption((opt) => opt.setName("amount").setDescription("Amount to award").setRequired(true))
     .addStringOption((opt) => opt.setName("users").setDescription("Text containing multiple user mentions or IDs").setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   new SlashCommandBuilder().setName("timely").setDescription("Claim your timely reward every 6 hours"),
+  new SlashCommandBuilder()
+    .setName("configure")
+    .setDescription("Configure guild settings")
+    .addSubcommand((sub) =>
+      sub
+        .setName("timely-reward")
+        .setDescription("Set the timely reward amount")
+        .addIntegerOption((opt) => opt.setName("amount").setDescription("Reward amount").setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("timely-interval")
+        .setDescription("Set the timely interval in hours")
+        .addIntegerOption((opt) => opt.setName("hours").setDescription("Interval in hours").setRequired(true))
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -99,29 +140,34 @@ client.on("interactionCreate", async (interaction) => {
   // /bal
   if (interaction.commandName === "bal") {
     const balance = await getBalance(userId, guildId);
-    await interaction.reply(`Your balance is ${balance} coins.`);
+    await interaction.reply(`Your balance is ${balance} points.`);
   }
 
   // /timely
   else if (interaction.commandName === "timely") {
     const now = DateTime.utc();
-    let lastTimelyIso = await getLastTimely(userId, guildId);
+    const timelyReward = (await getGuildSetting(guildId, "timely_reward")) || 100;
+    const timelyIntervalHours = (await getGuildSetting(guildId, "timely_interval_hours")) || 24;
+
+    let lastTimelyIso = await getLastTimely(interaction.user.id, guildId);
     let canClaim = true;
     if (lastTimelyIso) {
       const lastTimely = DateTime.fromISO(lastTimelyIso, { zone: "utc" });
       const diff = now.diff(lastTimely, "hours").hours;
-      if (diff < TIMELY_INTERVAL_HOURS) {
+      if (diff < timelyIntervalHours) {
         canClaim = false;
-        const next = lastTimely.plus({ hours: TIMELY_INTERVAL_HOURS });
+        const next = lastTimely.plus({ hours: timelyIntervalHours });
         const wait = next.diff(now).toFormat("h 'hours,' m 'minutes'");
+
         return interaction.reply({ content: `You can claim again in ${wait}.`, ephemeral: true });
       }
     }
     if (canClaim) {
-      const balance = await getBalance(userId, guildId);
-      await setBalance(userId, guildId, balance + TIMELY_REWARD);
-      await setLastTimely(userId, guildId, now.toISO());
-      return interaction.reply(`You claimed ${TIMELY_REWARD} coins! Come back in 6 hours.`);
+      const balance = await getBalance(interaction.user.id, guildId);
+      await setBalance(interaction.user.id, guildId, balance + timelyReward);
+      await setLastTimely(interaction.user.id, guildId, now.toISO());
+
+      return interaction.reply(`You claimed ${timelyReward} points! Come back in ${timelyIntervalHours} hours.`);
     }
   }
 
@@ -154,7 +200,17 @@ client.on("interactionCreate", async (interaction) => {
       await setBalance(rid, guildId, bal + amount);
     }
 
-    await interaction.reply({ content: `You awarded ${amount} coins to ${recipients.length} user(s)!`, ephemeral: true });
+    await interaction.reply({ content: `You awarded ${amount} points to ${recipients.map(r => `<@${r}>`).join(', ')}!` });
+  } else if (interaction.commandName === "configure") {
+    if (interaction.options.getSubcommand() === "timely-reward") {
+      const amount = interaction.options.getInteger("amount");
+      await setGuildSetting(guildId, "timely_reward", amount);
+      return interaction.reply({ content: `Timely reward set to ${amount} points.`, ephemeral: true });
+    } else if (interaction.options.getSubcommand() === "timely-interval") {
+      const hours = interaction.options.getInteger("hours");
+      await setGuildSetting(guildId, "timely_interval_hours", hours);
+      return interaction.reply({ content: `Timely interval set to ${hours} hours.`, ephemeral: true });
+    }
   }
 });
 
