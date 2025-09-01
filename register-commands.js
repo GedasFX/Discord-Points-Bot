@@ -1,6 +1,8 @@
 const { REST, SlashCommandBuilder, PermissionsBitField, Routes } = require("discord.js");
 require("dotenv").config();
 
+const afterDarkGuildId = '606008765270982656';
+
 const commands = [
   new SlashCommandBuilder()
     .setName("bal")
@@ -34,11 +36,18 @@ const commands = [
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 ].map((cmd) => cmd.toJSON());
 
+const guildCommands = [
+  new SlashCommandBuilder()
+    .setName("moon")
+    .setDescription("Claim your timely reward every 6 hours")
+].map((cmd) => cmd.toJSON());
+
 const rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
 
 (async () => {
   try {
     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, afterDarkGuildId), { body: guildCommands });
     console.log("Slash commands registered!");
   } catch (error) {
     console.error(error);

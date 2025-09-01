@@ -27,6 +27,7 @@ module.exports = {
   },
   setBalance(userId, guildId, amount) {
     return new Promise((resolve, reject) => {
+      db.run("INSERT OR IGNORE INTO users(user_id, guild_id, balance) VALUES (?, ?, ?)", [userId, guildId, amount]);
       db.run("UPDATE users SET balance = ? WHERE user_id = ? AND guild_id = ?", [amount, userId, guildId], (err) => {
         if (err) reject(err);
         else resolve();

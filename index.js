@@ -22,7 +22,10 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   // /timely
-  else if (interaction.commandName === "timely") {
+  else if (
+    interaction.commandName === "timely" ||
+    interaction.commandName === "moon" // For AfterDark server
+  ) {
     const now = DateTime.utc();
     const timelyReward = (await db.getGuildSetting(guildId, "timely_reward")) || 100;
     const timelyIntervalHours = (await db.getGuildSetting(guildId, "timely_interval_hours")) || 24;
