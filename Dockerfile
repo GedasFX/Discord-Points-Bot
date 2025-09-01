@@ -10,6 +10,6 @@ COPY . .
 RUN mv scripts/register.sh ./register
 
 VOLUME [ "/app/data" ]
-USER 1891
+USER 1000
 
 ENTRYPOINT ["node", "index.js"]
