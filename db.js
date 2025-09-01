@@ -1,5 +1,5 @@
 const sqlite3 = require("sqlite3").verbose();
-const db = new sqlite3.Database("./bot.db");
+const db = new sqlite3.Database("./data/bot.db");
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
